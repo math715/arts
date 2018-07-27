@@ -1,7 +1,6 @@
-#使用llvm实现一门语言 —— cava 
+# 使用llvm实现一门语言 —— cava 
 
-
-###背景
+## 背景
 
 cava 产生的背景，是由于ha3业务方对插件定制及版本兼容需求，要求我们基于llvm开发一种性能与c++相当的类java脚本语言。
 经过我们的调查发现：
@@ -22,13 +21,13 @@ groovy是jvm语言，它和用java开发的elasticsearch比较配。ha3是用c++
 cava使用Bison和flex来实现词法语法分析，使用llvm来实现中间代码到编译执行
 词法 & 语法
 
-基于 Bison 和 flex 实现词法语法分析器
+## 基于 Bison 和 flex 实现词法语法分析器
 
-```c++
+
 token
 
 token定义
-
+```c
 %token BOOLEAN // primitive_type
 %token CHAR BYTE SHORT INT LONG UBYTE USHORT UINT ULONG // integral_type
 %token DOUBLE FLOAT // floating_point_type
@@ -111,7 +110,7 @@ conditional_and_expression : inclusive_or_expression {
     $$ = NodeFactory::createBinaryOpExpr(ctx, @$, $1, BinaryOpExpr::OT_COND_AND, $3);
 }
 ```
-AST
+## AST
 AST 生成
 
 在语法分析的时候，cava利用NodeFactory类生成对应的AST，把token连接成语法树
@@ -184,7 +183,7 @@ CREATE_NODE_IMPL_BODY(T, arg1, arg2, arg3)
     return val;                                                     \
 }
 ```
-cava AST 设计大纲
+### cava AST 设计大纲
 Overall
 
     编译模块(Module): has a module
@@ -247,7 +246,7 @@ cava支持多种用户自定义的插件，其中重要的一类是自定义AST�
 默认构造函数插件
 
 用于对为实现构造函数的类自动生成的默认构造函数
-
+```c++
 bool AddDefaultCtor::process(ASTContext &astCtx) {
     for (auto classDecl : astCtx.getClassDecls()) {  // for all class
         if (!classDecl->getCtors().empty() ||
@@ -272,6 +271,7 @@ bool AddDefaultCtor::process(ASTContext &astCtx) {
     }
     return true;
 }
+```
 
 报错信息
 
@@ -295,6 +295,7 @@ cava是以module形式管理代码的，类型的注册和生命周期都是基�
 
 数组类型由数组的维数和其基类型（class类型或基础类型）共同组成，cava定义数组类型，数组可以显示的调用length:
 
+```c++
 template<typename T>
 class CavaArrayType
 {
@@ -305,7 +306,7 @@ public:
 private:
     T *_data;
 }
-
+```
 可以看出，不同维数的数组是不一样的类型，因此，当生成n维数组的时候，我们会递归的生成n-1维到1维数组类型。
 类型推导 & 检测
 
@@ -322,7 +323,7 @@ image
 cava生成IR的步骤：
 
     生成Module
-
+```c++
 llvm Module构造，传入llvm::Context，llvm Context初始构造可以为空
 
 llvm::Module(moduleName, llvmContext); // string name, llvm::Context *context
@@ -357,9 +358,10 @@ Stmt和Expr 对应到llvm中均为llvm::Instructions
 
 irBuilder(context); // llvm::Context *context
 irBuilder.SetInsertPoint(entryBB); // llvm::BasicBlock *entryBB
-
+```
 分支语句的生成，以if语句为例：
 
+```c++
 bool CodeGenFunction::handleIfStmt(IfStmt *ifStmt) {
     llvm::BasicBlock *thenBlock = createBasicBlock("if.then");
     llvm::BasicBlock *contBlock = createBasicBlock("if.end");
@@ -390,7 +392,7 @@ bool CodeGenFunction::handleIfStmt(IfStmt *ifStmt) {
     emitBlock(contBlock, true);
     return true;
 }
-
+```
     生成表达式的IR(cava Stmt -> cava Expr)
 
 同理，使用 llvm::IRBuilder 工具生成Expr对应的指令集。
@@ -408,6 +410,7 @@ bool CodeGenFunction::handleIfStmt(IfStmt *ifStmt) {
 
 cava不提供类似JVM的GC机制，作为一门脚步语言，采用允许用户自定义的内存分配方式。目前默认的简单内存实现是使用mem pool，作为脚步语言内存的持有一直到cava生命周期结束。
 
+```cpp
 void *_cava_alloc_(CavaCtx *ctx, size_t size, int flag) {
     if (size == 0) {
         ++size;
@@ -423,7 +426,7 @@ void *alloc(size_t size) {
     return _pool.allocate(size);
 }
 autil::mem_pool::Pool _pool;
-
+```
 在CavaCtx 类中包含了可自定义的内存管理工具userCtx，所有的cava函数的第一项非this指针参数，均为 *CavaCtx，用于在每个方法中管理内存和异常信息。
 
 以ha3调用cava举例，ha3使用mem pool自定义了Ha3CavaAllocator用于cava内存管理，在每个线程开始时创建cavaCtx的Ha3CavaAllocator，在调用插件的接口处传入cavaCtx，用于执行cava脚本
@@ -433,7 +436,7 @@ Pass
 截止到目前，已经生成了未经过Pass优化前的llvm IR代码，通过llvm::errs() << module; 打印出llvm Module 对应的IR代码：
 
 cava代码
-
+```java
 class Example {
     static int add(int a, int b) {
         return a + b;
@@ -446,9 +449,11 @@ class Example {
         return add(a, b);
     }
 }
+```
 
 对应的未经过pass优化的IR，由于cava有一些内置的异常检测，以及未经过任何pass优化，所以会显得复杂点，后续会将异常检测重新设计，不再程序中内置检测，能够减少指令数，
 
+```c
 define i32 @_ZN7Example3addEP7CavaCtxii(%class.CavaCtx* %"@cavaCtx@", i32 %a, i32 %b) {
     entry:
         %"@cavaCtx@1" = alloca %class.CavaCtx*
@@ -500,11 +505,12 @@ define i32 @_ZN7Example4mainEP7CavaCtx(%class.CavaCtx* %"@cavaCtx@") {
     if.end4:                                          ; preds = %if.end
         ret i32 %5
 }
-
+```
 Pass 优化及编写，这也是编译语言的精髓之处，不幸的是，笔者还未深入这一领域，cava参考了clang -O2 的优化pass，执行了FunctionPasses， ModulePasses， CodeGenPasses等优化，使得性能接近c++，不过c++ 的pass有些过于复杂，不适合JIT阶段使用，以及JIT独有的PGO，根据线上真实场景做codegen等优化尚未实现，这里面的性能提升空间还是很有潜力的，希望与大家一同探究。（题外话，随着对pass的了解，可以说未涉及pass的编译器还只是初级阶段。）
 
 下文中会提到，处于性能考虑，我们也仿照llvm 的Clone Module，类似的实现了一个可以跨Module 的clone function Pass，用于将加载的bc module inline 到其他module中，减少函数调用。
 
+```c
 bool CavaModule::cloneGlobals() {
     auto module = _bitCodeManager.getModule(); // 取出bc 中的moduke
     if (!module) {
@@ -524,7 +530,7 @@ bool CavaModule::cloneGlobals() {
     }
     return true;
 }
-
+```
 __dso_handle，__cxa_atexit，用于c++链接
 JIT & 执行
 JIT
@@ -534,6 +540,7 @@ llvm 同时支持 AOT编译和JIT编译，JIT编译依赖于llvm TargetMachine�
 cava JIT通过llvm ORC来生成jit编译, ORC编译需要定义一个llvm::orc::IRCompileLayer。
 
 // 需要定义一个Compiler类，用于执行各类pass优化
+```c
 _compileLayer.reset(new CompileLayerT(_objectLayer,
     CavaCompiler(_targetMachine.get(), _config.debugIR)));
 auto resolver = llvm::orc::createLambdaResolver(
@@ -547,11 +554,13 @@ auto handle = _compileLayer->addModuleSet(
     singletonSet(cavaModule->getLLVMModule()),
     llvm::make_unique<llvm::SectionMemoryManager>(),
     std::move(resolver));
-
+```
 执行代码
 
 执行代码通过找到函数符号对应的地址，直接调用function即可
 
+
+```c
 typedef int (*MainProtoType)(CavaCtx *);
 llvm::JITSymbol jitSymbol = cavaJit->findSymbol(cavaModule->getMangleMainName());    // mangle后的name，下一章会详细介绍
 MainProtoType mainFunc = (MainProtoType) jitSymbol.getAddress();
@@ -560,7 +569,7 @@ if (!mainFunc) {
     return 0;
 }
 int ret = mainFunc(&cavaCtx);
-
+```
 与c/c++的交互
 
 cava 的设计之初就是追求高性能，尤其是与c++的交互
@@ -578,6 +587,5 @@ image
 
 有了加载bc后，可以将cava原生代码和c++代码联合在一起编译，但是仍未解决cava调用c++函数这一层函数调用的开销，于是就有了跨模块inline的pass设计。我们利用IR定制了一个跨模块clone function的Pass，将不同module的函数及全局变量等通过递归的形式clone到本module中，再进行inline 优化，从而减少了函数调用。
 参考 & 工具
-
-    Kaleidoscope tutorial
-    llvm tools
+Kaleidoscope tutorial
+llvm tools
