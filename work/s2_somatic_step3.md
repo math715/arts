@@ -184,5 +184,42 @@ get_indel_het_grid_lhood
 
 ### 
 ```c++
-calculate_result_set_grid
+const double noindel_lnp(alt_path_lnp);
+const double hom_lnp(path_lnp.indel);
+
+// allele ratio convention is that the indel occurs at the
+// het_allele ratio and the alternate allele occurs at
+// (1-het_allele_ratio):
+{
+    double log_ref_prob(log_chet_ratio);
+    double log_indel_prob(log_het_ratio);
+    if (! is_breakpoint)
+    {
+        get_het_observed_allele_ratio(path_lnp.read_length,sample_opt.min_read_bp_flank,
+                                        indelKey,het_ratio,log_ref_prob,log_indel_prob);
+    }
+    const double het_lnp(getLogSum(noindel_lnp+log_ref_prob, hom_lnp+log_indel_prob));
+
+    het_lhood_low += integrateOutMappingStatus(dopt, path_lnp.nonAmbiguousBasesInRead, het_lnp, is_tier2_pass);
+}
+
+{
+    double log_ref_prob(log_het_ratio);
+    double log_indel_prob(log_chet_ratio);
+    if (! is_breakpoint)
+    {
+        get_het_observed_allele_ratio(path_lnp.read_length,sample_opt.min_read_bp_flank,
+                                        indelKey,chet_ratio,log_ref_prob,log_indel_prob);
+    }
+    const double het_lnp(getLogSum(noindel_lnp+log_ref_prob, hom_lnp+log_indel_prob));
+
+    het_lhood_high += integrateOutMappingStatus(dopt, path_lnp.nonAmbiguousBasesInRead, het_lnp, is_tier2_pass);
+}
+```
+
+
+```c++
+Function integrateOutMappingStatus
+getLogSum((correctMappingLogLikelihood + dopt.correctMappingLogPrior),
+                     getIncorrectMappingLogLikelihood(dopt, isTier2, nonAmbiguousBasesInRead) 
 ```

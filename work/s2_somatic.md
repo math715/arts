@@ -94,6 +94,99 @@ process_simple_indel 2I or 3D
 ```c++
 Function 1.4 addAlignmentIndelsToPosProcessor
 
+// 计算 STR repeat_unit repeat_count
+// 1 insert / delete -> indel_seq
+// 2 swap -> insert and delete -> indel_seq 
+// 
+
+function get_seq_repeat_unit 
+    n <- indel_seq.size()
+    for i <- 1 to n -1
+        is_repeat <- true
+        if n % i == 0
+            for j <- i; j < n; j += i
+                for k <- 0 to k -1
+                    if (indel_seq[j+k] != indel_seq[j])
+                        is_repeat <- false
+        if (is_repeat) 
+            repeat_unit <- indel_seq[0,...,i]
+            repeat_count <- n / i
+if (swap && delete_repeat_unit == insert_repeat_unit)
+    repeat_unit <- delete_repeat_unit
+
+indel_context_repeat_count <- 0
+
+// count upstream repeats
+for i = indel.start_pos - repeat_count ; i >= 0; i -= repeat_count
+    ref_repeat_unit = ref[i,...,i+repeart_count]
+    if (repeatunit == ref_repeat_unit)
+        indel_context_repeat_count ++
+
+// count downstream repeats:     
+for i = indel.end_pos - repeat_count ; i + repeat_unit_size < ref_length; i += repeat_count
+    ref_repeat_unit = ref[i,...,i+repeart_count]
+     if (repeatunit == ref_repeat_unit)
+        indel_context_repeat_count ++
+
+refRepeatCount <- indel_context_repeat_count + delete_repeat_count
+indelRepeatCount <- indel_context_repeat_count + insert_repeat_count
+
+// 计算 interruptedHomopolymerLength ref pos 
+// Get the length of the longest homopolymer extending from \p pos
+function interruptedHomopolymerLength
+// count current base + upstream repeats
+    for i = pos ; i >= 0; i--
+        b <- ref[i]
+        //连续 double base相等长度
+//  extend downstream
+    for i = pos + 1; i < ref_end; ++i
+        b <- ref[i]
+
+// count current base + downstream repeats:
+    for i = pos; i < ref_end; ++i
+//  extend downstream
+    for i = pos - 1 ; i >= 0; i--
+
+interruptedHomopolymerLength = max( interruptedHomopolymerLength(begin_pos -1), interruptedHomopolymerLength(pos))
+if (indel_begin_pos != indel_end_pos) {
+    interruptedHomopolymerLength = max(interruptedHomopolymerLength, interruptedHomopolymerLength(indel_end_pos-1), interruptedHomopolymerLength(indel_end_pos))
+}
+
+
+```
+
+### Initialize error rates
+// case 1 Simple Indel
+// case 2 swap Indel 
+compute refToIndelErrorProb and indelToRefErrorProb
+```c++
+function 1.5 getIndelErrorRate
+// Retrieve indel error rates for a specific indel type.
+// base 1 index base 0
+case 1 
+    baselineInsertionErrorRate <- getRate[0][0] 
+    baselineDeletionErrorRate <- getRate[0][0]
+    refToIndelErrorProb <- baselineInsertionErrorRate
+    indelToRefErrorProb <- refToIndelErrorProb
+case 2 
+    // function 1.5 
+    repeatingPatternSize <- max(1, repeatUnitLength)
+    refPatternRepeatCount <- max(1, refRepeatCount)
+    indelPatternRepeatCount <- max(1, indelRepeatCount)
+    if refPatternRepeatCount > 1 // Default repeatingPatternSize 1
+        refPatternRepeatCount <- 1 
+        repatternRepeatCount <- 1
+    repeatingPatternSizeIndex <- refPatternRepeatCount - 1
+    patternRepeatCountIndex <- repatternRepeatCount - 1
+    refToIndelErrorProb <- getRate[repeatingPatternSizeIndex][patternRepeatCountIndex]
+// reverse Indel : Insert -> Delete or Delete -> Indel 
+    if indelPatternRepeatCount > 1 
+        indelPatternRepeatCount <- 1
+        repatternRepeatCount <- 1 
+    indelToRefErrorProb <- getRate[repeatingPatternSizeIndex][patternRepeatCountIndex]
+
+// candidateRefToIndelErrorProb  candidateIndelToRefErrorProb 计算同上
+
 ```
 
 ### Indel Error model
@@ -111,11 +204,12 @@ eh <- log(3*10e-4)
 C <- 15
 S <- 1
 for p <- 1 to C 
-    do 
     highErrorFrac <- min(p-1, C) / C
     lowErrorFrac <- (1.0 - highErrorFrac) * el - highErrorFrac * eh
     errorRate[S-1][p-1] <- exp(logErrorRate)
 ```
+
+
 
 
 
