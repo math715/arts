@@ -22,11 +22,24 @@ int countDigitOne(int n) {
     }
     return result;
 }
+
+int TcountDigitOne(int n)
+{
+    int countr = 0;
+    for (long long i = 1; i <= n; i *= 10) {
+        long long divider = i * 10;
+        countr += (n / divider) * i + min(max(n % divider - i + 1, 0LL), i);
+    }
+    return countr;
+}
+void Test(int value) {
+    cout << value << " " << countDigitOne(value) << " " << TcountDigitOne(value) << endl;
+}
 int main( int argc, char *argv[] ) {
-    cout << countDigitOne(13) << endl;
-    cout << countDigitOne(10) << endl;
-    cout << countDigitOne(100) << endl;
-    cout << countDigitOne(1000) << endl;
+    Test(13) ;
+    Test(10) ;
+    Test(100) ;
+    Test(1000) ;
 
     return 0;
 }
